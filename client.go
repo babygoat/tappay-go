@@ -1,7 +1,11 @@
 package tappay
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -9,8 +13,18 @@ import (
 )
 
 const (
+	// SandboxAPIURL is the url of TapPay server for testing.
+	SandboxAPIURL string = "https://sandbox.tappaysdk.com/"
+
 	// APIURL is the url of TapPay server for transaction in production server.
 	APIURL string = "https://prod.tappaysdk.com/"
+)
+
+// type service denotes the the operations provided by TapPay
+type service string
+
+const (
+	serviceRecord service = "record"
 )
 
 type client struct {
@@ -75,4 +89,55 @@ func WithHTTPClient(hClient *http.Client) clientOption {
 	return func(c *client) {
 		c.httpClient = hClient
 	}
+}
+
+// do is used to issue the http request with client to TapPay server and parse the http.Response
+func (c *client) do(req *http.Request) ([]byte, error) {
+	rawResp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer rawResp.Body.Close()
+
+	var b []byte
+	buf := bytes.NewBuffer(b)
+	if _, err = io.Copy(buf, rawResp.Body); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// newRequest is used to create the http request with the input. Also, appends the common header like
+// `content-type`, `x-api-key` and injects the common field `partner_key` into request body.
+func (c *client) newRequest(ctx context.Context, method string, svc service, input Marshaler) (*http.Request, error) {
+	paramsMap, err := input.MarshalMap()
+	if err != nil {
+		return nil, err
+	}
+
+	var svcPath string
+	switch svc {
+	case serviceRecord:
+		svcPath = recordPath
+	}
+
+	u, _ := url.Parse(svcPath)
+	base, _ := url.Parse(c.url)
+	path := base.ResolveReference(u).String()
+
+	paramsMap["partner_key"] = c.partnerKey
+	body, _ := json.Marshal(paramsMap)
+	req, err := http.NewRequestWithContext(ctx, method, path, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, fmt.Errorf("cannot create a TapPay request: %v", err)
+	}
+	req.Header.Add("x-api-key", c.partnerKey)
+	req.Header.Add("Content-Type", "application/json")
+	return req, nil
+}
+
+// Marshaler is the interface implemented by the types
+// that would marshal themselves into valid map
+type Marshaler interface {
+	MarshalMap() (map[string]interface{}, error)
 }
