@@ -24,7 +24,8 @@ const (
 type service string
 
 const (
-	serviceRecord service = "record"
+	servicePayByPrime service = "pay_by_prime"
+	serviceRecord     service = "record"
 )
 
 type client struct {
@@ -117,6 +118,8 @@ func (c *client) newRequest(ctx context.Context, method string, svc service, inp
 
 	var svcPath string
 	switch svc {
+	case servicePayByPrime:
+		svcPath = payByPrimePath
 	case serviceRecord:
 		svcPath = recordPath
 	}
