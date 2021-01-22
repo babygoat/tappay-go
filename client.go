@@ -26,6 +26,7 @@ type service string
 const (
 	servicePayByPrime service = "pay_by_prime"
 	serviceRecord     service = "record"
+	serviceRefund     service = "refund"
 )
 
 type client struct {
@@ -122,6 +123,8 @@ func (c *client) newRequest(ctx context.Context, method string, svc service, inp
 		svcPath = payByPrimePath
 	case serviceRecord:
 		svcPath = recordPath
+	case serviceRefund:
+		svcPath = refundPath
 	}
 
 	u, _ := url.Parse(svcPath)
